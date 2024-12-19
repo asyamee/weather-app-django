@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прогноз погоды</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{% static 'weather/styles.css' %}">
+</head>
+<body>
+    <div id="margin-div">
+        <h1>Прогноз погоды</h1>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="text" name="city_name" placeholder="Enter city" required>
+            <select name="units">
+                <option value="metric">Цельсий</option>
+                <option value="imperial">Фаренгейт</option>
+            </select>
+            <button type="submit">Узнать погоду</button>
+        </form>
+
+        {% if error %}
+            <p style="color: red;">{{ error }}</p>
+        {% elif weather %}
+            <h2>Прогноз погоды в {{ city }}</h2>
+            <ul>
+                <li>Температура: {{ weather.list.0.main.temp }}
+                    {% if units == "metric" %}°C{% else %}°F{% endif %}</li>
+                <li>Облачность: {{ weather.list.0.clouds.all }}%</li>
+                <li>Скорость ветра: {{ weather.list.0.wind.speed }} m/s</li>
+                <li>Влажность: {{ weather.list.0.main.humidity }}%</li>
+                <li>Давление: {{ weather.list.0.main.pressure }} hPa</li>
+            </ul>
+
+            <h3>Прогноз на следующие {{ days }} дней:</h3>
+            <canvas id="forecastChart" width="400" height="200"></canvas>
+            <script>
+                const ctx = document.getElementById('forecastChart').getContext('2d');
+                const chartData = {
+                    labels: [
+                        {% for item in weather.list %}
+                            {% if forloop.counter0|divisibleby:8 and forloop.counter0 < max_entries %}
+                                "{{ item.dt_txt }}",
+                            {% endif %}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        label: 'Температура',
+                        data: [
+                            {% for item in weather.list %}
+                                {% if forloop.counter0|divisibleby:8 and forloop.counter0 < max_entries %}
+                                    {{ item.main.temp }},
+                                {% endif %}
+                            {% endfor %}
+                        ],
+                        borderColor: 'blue',
+                        backgroundColor: 'blue',
+                        borderWidth: 3,
+                        fill: false
+                    }]
+                };
+                const plugin = {
+                    id: 'customCanvasBackgroundColor',
+                    beforeDraw: (chart, args, options) => {
+                        const {ctx} = chart;
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'destination-over';
+                        ctx.fillStyle = options.color || '#99ffff';
+                        ctx.fillRect(0, 0, chart.width, chart.height);
+                        ctx.restore();
+                    }
+                };
+                new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        plugins: {
+                            customCanvasBackgroundColor: {
+                                color: 'white',
+                            }
+                        }
+                    },
+                    plugins: [plugin],
+                });
+            </script>
+        {% endif %}
+
+        <h3>История поиска:</h3>
+        <ul>
+            {% for city in history %}
+                <li>{{ city.city_name }} ({{ city.searched_at }})</li>
+            {% endfor %}
+        </ul>
+    </div>
+    <footer>
+        <p>
+            Анастасия Бородкина. 2024.
+        </p>
+    </footer>
+</body>
+</html>
